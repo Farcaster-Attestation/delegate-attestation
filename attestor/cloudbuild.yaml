@@ -3,7 +3,7 @@ steps:
     args:
       [
         '--cache=true',
-        '--destination=asia.gcr.io/$PROJECT_ID/$REPO_NAME/$REPO_NAME-${_SERVICE_ENV}:$SHORT_SHA',
+        '--destination=asia.gcr.io/$PROJECT_ID/$REPO_NAME/$BRANCH_NAME',
       ]
   - name: 'asia.gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
@@ -12,7 +12,7 @@ steps:
         'run',
         'deploy',
         'oppassport-passport-attestator-${_SERVICE_ENV}',
-        '--image=asia.gcr.io/$PROJECT_ID/$REPO_NAME/$REPO_NAME-${_SERVICE_ENV}:$SHORT_SHA',
+        '--image=asia.gcr.io/$PROJECT_ID/$REPO_NAME/$BRANCH_NAME',
         '--region=asia-southeast1',
         '--port=80',
         '--allow-unauthenticated',
@@ -20,7 +20,7 @@ steps:
   - name: 'asia-docker.pkg.dev/gcr-cleaner/gcr-cleaner/gcr-cleaner-cli'
     args:
       - -repo
-      - 'asia.gcr.io/$PROJECT_ID/$REPO_NAME/$REPO_NAME-${_SERVICE_ENV}'
+      - 'asia.gcr.io/$PROJECT_ID/$REPO_NAME/$BRANCH_NAME'
       - -keep
       - '3'
       - -tag-filter-any
