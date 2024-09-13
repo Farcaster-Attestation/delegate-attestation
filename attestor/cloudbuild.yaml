@@ -15,7 +15,7 @@ steps:
       [
         'run',
         'deploy',
-        'oppassport-passport-attestator-${_SERVICE_ENV}',
+        'dynamic-attestation-mvp-$BRANCH_NAME',
         '--image=asia.gcr.io/$PROJECT_ID/$REPO_NAME/$BRANCH_NAME',
         '--region=asia-southeast1',
         '--port=80',
