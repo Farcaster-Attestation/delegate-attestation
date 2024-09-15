@@ -1,0 +1,28 @@
+steps:
+  # Build and push the container image
+  - name: 'gcr.io/kaniko-project/executor:latest'
+    id: build
+    waitFor:
+      - '-'
+    args:
+      - --destination
+      - asia.gcr.io/$PROJECT_ID/$REPO_NAME/labeler/$BRANCH_NAME
+      - --dockerfile
+      - ./labeler/Dockerfile
+      - --context
+      - ./labeler
+      - --cache=true
+
+  # Deploy container image to Cloud Run
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args:
+      [
+        'run',
+        'deploy',
+        'dynamic-attestation-mvp-labeler-$BRANCH_NAME',
+        '--image',
+        'asia.gcr.io/$PROJECT_ID/$REPO_NAME/labeler/$BRANCH_NAME',
+        '--region',
+        'asia-southeast1',
+      ]
+    waitFor: ['build']
