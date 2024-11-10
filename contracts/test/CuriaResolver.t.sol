@@ -5,7 +5,15 @@ import {Test, console} from "forge-std/Test.sol";
 import {CuriaResolver, ICuriaResolver} from "@dynamic-attestation/src/CuriaResolver.sol";
 import {ISchemaResolver} from "@eas/contracts/resolver/ISchemaResolver.sol";
 import {ISchemaRegistry, SchemaRegistry} from "@eas/contracts/SchemaRegistry.sol";
-import {IEAS, EAS, AttestationRequest, AttestationRequestData, Attestation, RevocationRequestData, RevocationRequest} from "@eas/contracts/EAS.sol";
+import {
+    IEAS,
+    EAS,
+    AttestationRequest,
+    AttestationRequestData,
+    Attestation,
+    RevocationRequestData,
+    RevocationRequest
+} from "@eas/contracts/EAS.sol";
 import {AccessDenied} from "@eas/contracts/Common.sol";
 
 contract CuriaResolverTest is Test {
@@ -70,14 +78,8 @@ contract CuriaResolverTest is Test {
         bytes32 attestId = eas.attest(request);
         vm.stopPrank();
         // test revoke with anon
-        RevocationRequestData memory revocationData = RevocationRequestData({
-          uid: attestId,
-          value: 0
-        });
-        RevocationRequest memory revocation = RevocationRequest({
-          schema: schemaId,
-          data: revocationData
-        });
+        RevocationRequestData memory revocationData = RevocationRequestData({uid: attestId, value: 0});
+        RevocationRequest memory revocation = RevocationRequest({schema: schemaId, data: revocationData});
 
         vm.startPrank(anon);
         vm.expectRevert(AccessDenied.selector);
