@@ -23,6 +23,7 @@ contract DeployCuriaResolver is Script {
         vm.startBroadcast(deployerAddress);
         EAS eas = EAS(easAddress);
         resolver = new CuriaResolver(eas);
+        resolver.setIssuer(deployerAddress, true);
         vm.stopBroadcast();
 
         // write output

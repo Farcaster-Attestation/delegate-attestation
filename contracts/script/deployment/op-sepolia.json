@@ -1,8 +1,8 @@
 {
   "chainInfo": {
     "chainId": 11155420,
-    "deploymentBlock": 19715813,
-    "timestamp": 1731234166
+    "deploymentBlock": 19719350,
+    "timestamp": 1731241240
   },
-  "resolver": "0xc21B6638AfaFafC425d8DFE8a7fCDE23FB5F39C2"
+  "resolver": "0x6da1D6b395A39C03edfa5573fA31c4e4c3CE5240"
 }
