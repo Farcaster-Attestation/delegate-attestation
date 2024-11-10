@@ -35,7 +35,8 @@ info = {
 credential = service_account.Credentials.from_service_account_info(info)
 storage_client = storage.Client(credentials=credential)
 bigquery_client = bigquery.Client(credentials=credential)
-bucket = storage_client.bucket('dynamic_attestation_public')
+bucket_name = os.getenv("GCP_BUCKET_NAME")
+bucket = storage_client.bucket(bucket_name)
 
 app = FastAPI()
 
