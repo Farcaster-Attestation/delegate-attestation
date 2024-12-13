@@ -16,23 +16,69 @@ dataSources:
       apiVersion: 0.0.7
       language: wasm/assemblyscript
       entities:
-        - Approval
         - DelegateChanged
         - DelegateVotesChanged
-        - OwnershipTransferred
         - Transfer
       abis:
         - name: GovernanceToken
           file: ./abis/GovernanceToken.json
       eventHandlers:
-        - event: Approval(indexed address,indexed address,uint256)
-          handler: handleApproval
         - event: DelegateChanged(indexed address,indexed address,indexed address)
           handler: handleDelegateChanged
         - event: DelegateVotesChanged(indexed address,uint256,uint256)
           handler: handleDelegateVotesChanged
-        - event: OwnershipTransferred(indexed address,indexed address)
-          handler: handleOwnershipTransferred
         - event: Transfer(indexed address,indexed address,uint256)
           handler: handleTransfer
       file: ./src/governance-token.ts
+  # - kind: ethereum
+  #   name: TransparentUpgradeableProxy
+  #   network: optimism
+  #   source:
+  #     address: "0xcdf27f107725988f2261ce2256bdfcde8b382b10"
+  #     abi: TransparentUpgradeableProxy
+  #     startBlock: 71801427
+  #   mapping:
+  #     kind: ethereum/events
+  #     apiVersion: 0.0.7
+  #     language: wasm/assemblyscript
+  #     entities:
+  #       - AdminChanged
+  #       - BeaconUpgraded
+  #       - Upgraded
+  #     abis:
+  #       - name: TransparentUpgradeableProxy
+  #         file: ./abis/TransparentUpgradeableProxy.json
+  #     eventHandlers:
+  #       - event: AdminChanged(address,address)
+  #         handler: handleAdminChanged
+  #       - event: BeaconUpgraded(indexed address)
+  #         handler: handleBeaconUpgraded
+  #       - event: Upgraded(indexed address)
+  #         handler: handleUpgraded
+  #     file: ./src/transparent-upgradeable-proxy.ts
+  # - kind: ethereum
+  #   name: ERC1967Proxy
+  #   network: optimism
+  #   source:
+  #     address: "0x7f08f3095530b67cdf8466b7a923607944136df0"
+  #     abi: ERC1967Proxy
+  #     startBlock: 112918415
+  #   mapping:
+  #     kind: ethereum/events
+  #     apiVersion: 0.0.7
+  #     language: wasm/assemblyscript
+  #     entities:
+  #       - ERC1967ProxyAdminChanged
+  #       - ERC1967ProxyBeaconUpgraded
+  #       - ERC1967ProxyUpgraded
+  #     abis:
+  #       - name: ERC1967Proxy
+  #         file: ./abis/ERC1967Proxy.json
+  #     eventHandlers:
+  #       - event: AdminChanged(address,address)
+  #         handler: handleAdminChanged
+  #       - event: BeaconUpgraded(indexed address)
+  #         handler: handleBeaconUpgraded
+  #       - event: Upgraded(indexed address)
+  #         handler: handleUpgraded
+  #     file: ./src/erc-1967-proxy.ts

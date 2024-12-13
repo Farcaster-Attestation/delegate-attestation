@@ -1,48 +1,52 @@
-type Approval @entity(immutable: true) {
-  id: Bytes!
-  owner: Bytes! # address
-  spender: Bytes! # address
-  value: BigInt! # uint256
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
+type Account @entity {
+  id: ID!
+  address: String!
+  balance: BigInt!
+  delegatedTo: Delegate!
 }
 
-type DelegateChanged @entity(immutable: true) {
-  id: Bytes!
-  delegator: Bytes! # address
-  fromDelegate: Bytes! # address
-  toDelegate: Bytes! # address
-  blockNumber: BigInt!
-  blockTimestamp: BigInt!
-  transactionHash: Bytes!
+type Delegate @entity {
+  id: ID!
+  address: String!
+  balance: BigInt!
+  votingPower: BigInt!
+  delegators: [Account!]! @derivedFrom(field: "delegatedTo")
 }
 
-type DelegateVotesChanged @entity(immutable: true) {
-  id: Bytes!
-  delegate: Bytes! # address
-  previousBalance: BigInt! # uint256
-  newBalance: BigInt! # uint256
+type DelegateChangedEvent @entity {
+  id: ID!
+  delegator: String! # address
+  fromDelegate: String!
+  toDelegate: String!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
-  transactionHash: Bytes!
+  transactionHash: String!
 }
 
-type OwnershipTransferred @entity(immutable: true) {
-  id: Bytes!
-  previousOwner: Bytes! # address
-  newOwner: Bytes! # address
+type DelegateVotesChanged @entity {
+  id: ID!
+  delegate: String!
+  previousBalance: BigInt!
+  newBalance: BigInt!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
-  transactionHash: Bytes!
+  transactionHash: String!
 }
 
-type Transfer @entity(immutable: true) {
+type Transfer @entity {
   id: Bytes!
-  from: Bytes! # address
-  to: Bytes! # address
-  value: BigInt! # uint256
+  from: String!
+  to: String!
+  value: BigInt!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
-  transactionHash: Bytes!
+  transactionHash: String!
+}
+
+# aggregate types
+type DailyDelagate @entity {
+  id: ID!
+  date: BigInt!
+  delegate: String!
+  votingPower: BigInt!
 }
