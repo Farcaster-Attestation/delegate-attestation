@@ -8,12 +8,11 @@ type Account @entity {
 type Delegate @entity {
   id: ID!
   address: String!
-  balance: BigInt!
   votingPower: BigInt!
   delegators: [Account!]! @derivedFrom(field: "delegatedTo")
 }
 
-type DelegateChangedEvent @entity {
+type DelegateChanged @entity {
   id: ID!
   delegator: String! # address
   fromDelegate: String!
@@ -34,7 +33,7 @@ type DelegateVotesChanged @entity {
 }
 
 type Transfer @entity {
-  id: Bytes!
+  id: ID!
   from: String!
   to: String!
   value: BigInt!
@@ -46,7 +45,7 @@ type Transfer @entity {
 # aggregate types
 type DailyDelagate @entity {
   id: ID!
-  date: BigInt!
+  date: Int!
   delegate: String!
   votingPower: BigInt!
 }
