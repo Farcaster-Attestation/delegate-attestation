@@ -15,6 +15,7 @@ import {
   updateAccountBalance,
   getDailyDelegate,
   ZERO_ADDRESS,
+  updateDailyBalance,
 } from "./helper";
 
 export function handleDelegateChanged(event: DelegateChangedEvent): void {
@@ -78,13 +79,18 @@ export function handleTransfer(event: TransferEvent): void {
   transfer.save();
 
   // mint
+  const timestamp = event.block.timestamp;
   if (from.toHex() == ZERO_ADDRESS) {
     updateAccountBalance(to, value);
+    updateDailyBalance(to, timestamp, value);
   } else if (to.toHex() == ZERO_ADDRESS) {
     // burn
     updateAccountBalance(from, value.neg());
+    updateDailyBalance(from, timestamp, value.neg());
   } else {
     updateAccountBalance(from, value.neg());
     updateAccountBalance(to, value);
+    updateDailyBalance(from, timestamp, value.neg());
+    updateDailyBalance(to, timestamp, value);
   }
 }

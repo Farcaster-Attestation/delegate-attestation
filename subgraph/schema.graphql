@@ -2,14 +2,15 @@ type Account @entity {
   id: ID!
   address: String!
   balance: BigInt!
-  delegatedTo: Delegate!
+  delegatedTo: Delegate
 }
 
 type Delegate @entity {
   id: ID!
   address: String!
   votingPower: BigInt!
-  delegators: [Account!]! @derivedFrom(field: "delegatedTo")
+  delegators: [Account]! @derivedFrom(field: "delegatedTo")
+  subdelegators: [SubDelegator]! @derivedFrom(field: "to")
 }
 
 type DelegateChanged @entity {
@@ -42,10 +43,76 @@ type Transfer @entity {
   transactionHash: String!
 }
 
+type ProxyAddress @entity {
+  id: ID!
+  address: String!
+  proxy: String!
+}
+
+enum AllowanceType {
+  Absolute
+  Relative
+}
+
+type SubDelegation @entity {
+  id: ID!
+  from: String!
+  to: String!
+  maxRedelegations: Int!
+  blocksBeforeVoteCloses: Int!
+  notValidBefore: Int!
+  notValidAfter: Int!
+  customRule: String!
+  allowanceType: AllowanceType!
+  allowance: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type SubDelegationRule @entity {
+  id: ID!
+  maxRedelegations: Int!
+  blocksBeforeVoteCloses: Int!
+  notValidBefore: Int!
+  notValidAfter: Int!
+  customRule: String!
+  allowanceType: AllowanceType!
+  allowance: BigInt!
+}
+
+type SubDelegator @entity {
+  id: ID!
+  address: String!
+  to: Delegate
+  rule: SubDelegationRule!
+}
+
 # aggregate types
 type DailyDelagate @entity {
   id: ID!
   date: Int!
   delegate: String!
   votingPower: BigInt!
+}
+
+type DailyBalance @entity {
+  id: ID!
+  date: Int!
+  account: String!
+  balance: BigInt!
+}
+
+type DailySubDelegation @entity {
+  id: ID!
+  date: Int!
+  from: String!
+  to: String!
+  maxRedelegations: Int!
+  blocksBeforeVoteCloses: Int!
+  notValidBefore: Int!
+  notValidAfter: Int!
+  customRule: String!
+  allowanceType: AllowanceType!
+  allowance: BigInt!
 }
