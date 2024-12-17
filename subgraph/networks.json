@@ -1,0 +1,14 @@
+{
+  "optimism": {
+    "GovernanceToken": {
+      "address": "0x4200000000000000000000000000000000000042",
+      "startBlock": 6490467
+    },
+    "TransparentUpgradeableProxy": {
+      "address": "0xcdf27f107725988f2261ce2256bdfcde8b382b10"
+    },
+    "ERC1967Proxy": {
+      "address": "0x7f08f3095530b67cdf8466b7a923607944136df0"
+    }
+  }
+}
