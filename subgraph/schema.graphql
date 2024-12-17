@@ -83,7 +83,7 @@ type DailyDelagate @entity {
   id: ID!
   date: Int!
   delegate: String!
-  votingPower: BigInt!
+  directVotingPower: BigInt!
 }
 
 type DailyBalance @entity {

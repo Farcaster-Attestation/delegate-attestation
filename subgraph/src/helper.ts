@@ -83,7 +83,7 @@ export function getDailyDelegate(
     dailyDelegate = new DailyDelagate(dailyDelegateId);
     dailyDelegate.delegate = address.toHex();
     dailyDelegate.date = startTimestamp;
-    dailyDelegate.votingPower = new BigInt(0);
+    dailyDelegate.directVotingPower = new BigInt(0);
   }
   return dailyDelegate;
 }

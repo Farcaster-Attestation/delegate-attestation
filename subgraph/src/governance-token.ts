@@ -55,11 +55,11 @@ export function handleDelegateVotesChanged(
   delegateVotesChanged.save();
   // update delegate voting power
   let delegateEntity = getDelegate(delegate);
-  delegateEntity.votingPower = newBalance;
+  delegateEntity.directVotingPower = newBalance;
   delegateEntity.save();
   // update daily delegate
   let dailyDelegate = getDailyDelegate(delegate, event.block.timestamp);
-  dailyDelegate.votingPower = newBalance;
+  dailyDelegate.directVotingPower = newBalance;
   dailyDelegate.save();
 }
 
