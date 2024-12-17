@@ -82,15 +82,15 @@ export function handleTransfer(event: TransferEvent): void {
   const timestamp = event.block.timestamp;
   if (from.toHex() == ZERO_ADDRESS) {
     updateAccountBalance(to, value);
-    updateDailyBalance(to, timestamp, value);
+    updateDailyBalance(to, timestamp);
   } else if (to.toHex() == ZERO_ADDRESS) {
     // burn
     updateAccountBalance(from, value.neg());
-    updateDailyBalance(from, timestamp, value.neg());
+    updateDailyBalance(from, timestamp);
   } else {
     updateAccountBalance(from, value.neg());
     updateAccountBalance(to, value);
-    updateDailyBalance(from, timestamp, value.neg());
-    updateDailyBalance(to, timestamp, value);
+    updateDailyBalance(from, timestamp);
+    updateDailyBalance(to, timestamp);
   }
 }

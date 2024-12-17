@@ -106,13 +106,10 @@ export function getDailyBalance(
   return dailyBalance;
 }
 
-export function updateDailyBalance(
-  address: Address,
-  timestamp: BigInt,
-  value: BigInt
-): void {
+export function updateDailyBalance(address: Address, timestamp: BigInt): void {
   let dailyBalance = getDailyBalance(address, timestamp);
-  dailyBalance.balance = dailyBalance.balance.plus(value);
+  const account = getAccount(address);
+  dailyBalance.balance = account.balance;
   dailyBalance.save();
 }
 
