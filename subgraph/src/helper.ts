@@ -1,10 +1,16 @@
-import { Address, BigInt } from "@graphprotocol/graph-ts";
+import { Address, BigInt, Bytes, json } from "@graphprotocol/graph-ts";
 import {
   Account,
   DailyBalance,
   DailyDelagate,
   Delegate,
+  ProxyAddress,
+  SubDelegationEntity,
 } from "../generated/schema";
+import {
+  AlligatorOPV5,
+  SubDelegationSubdelegationRulesStruct,
+} from "../generated/AlligatorOPV5/AlligatorOPV5";
 
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
@@ -89,4 +95,21 @@ export function updateDailyBalance(
   let dailyBalance = getDailyBalance(address, timestamp);
   dailyBalance.balance = dailyBalance.balance.plus(value);
   dailyBalance.save();
+}
+
+export function getProxyAddress(
+  address: Address,
+  contractAddress: Address
+): ProxyAddress {
+  let proxyAddressId = address.toHex();
+  let proxyAddress = ProxyAddress.load(proxyAddressId);
+  if (proxyAddress == null) {
+    const contract = AlligatorOPV5.bind(contractAddress);
+    const proxy = contract.proxyAddress(address);
+    proxyAddress = new ProxyAddress(proxyAddressId);
+    proxyAddress.address = address.toHex();
+    proxyAddress.proxy = proxy.toHex();
+    proxyAddress.save();
+  }
+  return proxyAddress;
 }
