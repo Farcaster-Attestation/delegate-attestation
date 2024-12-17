@@ -8,7 +8,7 @@ type Account @entity {
 type Delegate @entity {
   id: ID!
   address: String!
-  votingPower: BigInt!
+  directVotingPower: BigInt!
   delegators: [Account]! @derivedFrom(field: "delegatedTo")
   subdelegators: [SubDelegator]! @derivedFrom(field: "to")
 }
@@ -58,29 +58,24 @@ type SubDelegationEntity @entity {
   notValidBefore: BigInt!
   notValidAfter: BigInt!
   customRule: String!
-  allowanceType: String!
+  allowanceType: Int!
   allowance: BigInt!
   blockNumber: BigInt!
   blockTimestamp: BigInt!
   transactionHash: String!
 }
 
-type SubDelegationRule @entity {
-  id: ID!
-  maxRedelegations: Int!
-  blocksBeforeVoteCloses: Int!
-  notValidBefore: Int!
-  notValidAfter: Int!
-  customRule: String!
-  allowanceType: String!
-  allowance: BigInt!
-}
-
 type SubDelegator @entity {
   id: ID!
-  address: String!
+  from: String!
   to: Delegate
-  rule: SubDelegationRule!
+  maxRedelegations: Int!
+  blocksBeforeVoteCloses: Int!
+  notValidBefore: BigInt!
+  notValidAfter: BigInt!
+  customRule: String!
+  allowanceType: Int!
+  allowance: BigInt!
 }
 
 # aggregate types
@@ -105,9 +100,9 @@ type DailySubDelegation @entity {
   to: String!
   maxRedelegations: Int!
   blocksBeforeVoteCloses: Int!
-  notValidBefore: Int!
-  notValidAfter: Int!
+  notValidBefore: BigInt!
+  notValidAfter: BigInt!
   customRule: String!
-  allowanceType: String!
+  allowanceType: Int!
   allowance: BigInt!
 }

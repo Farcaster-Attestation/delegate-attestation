@@ -3,16 +3,35 @@ import {
   Account,
   DailyBalance,
   DailyDelagate,
+  DailySubDelegation,
   Delegate,
   ProxyAddress,
   SubDelegationEntity,
+  SubDelegator,
 } from "../generated/schema";
-import {
-  AlligatorOPV5,
-  SubDelegationSubdelegationRulesStruct,
-} from "../generated/AlligatorOPV5/AlligatorOPV5";
+import { AlligatorOPV5 } from "../generated/AlligatorOPV5/AlligatorOPV5";
 
 export const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+
+export class SubDelegationRuleObject {
+  maxRedelegations: i32;
+  blocksBeforeVoteCloses: i32;
+  notValidBefore: BigInt;
+  notValidAfter: BigInt;
+  customRule: Address;
+  allowanceType: i32;
+  allowance: BigInt;
+
+  constructor() {
+    this.maxRedelegations = 0;
+    this.blocksBeforeVoteCloses = 0;
+    this.notValidBefore = new BigInt(0);
+    this.notValidAfter = new BigInt(0);
+    this.customRule = Address.fromString(ZERO_ADDRESS);
+    this.allowanceType = 0;
+    this.allowance = new BigInt(0);
+  }
+}
 
 export function getAccount(address: Address): Account {
   let accountId = address.toHex();
@@ -37,7 +56,7 @@ export function getDelegate(address: Address): Delegate {
   if (delegate == null) {
     delegate = new Delegate(delegateId);
     delegate.address = address.toHex();
-    delegate.votingPower = new BigInt(0);
+    delegate.directVotingPower = new BigInt(0);
   }
   return delegate;
 }
@@ -47,7 +66,7 @@ export function updateDelegateVotingPower(
   value: BigInt
 ): void {
   let delegate = getDelegate(address);
-  delegate.votingPower = delegate.votingPower.plus(value);
+  delegate.directVotingPower = delegate.directVotingPower.plus(value);
   delegate.save();
 }
 
@@ -112,4 +131,89 @@ export function getProxyAddress(
     proxyAddress.save();
   }
   return proxyAddress;
+}
+
+export function getSubDelegator(from: Address, to: Address): SubDelegator {
+  let subdelegatorId = `${from.toHex()}-${to.toHex()}`;
+  let subdelegator = SubDelegator.load(subdelegatorId);
+  if (subdelegator == null) {
+    subdelegator = new SubDelegator(subdelegatorId);
+    subdelegator.from = from.toHex();
+    subdelegator.to = to.toHex();
+  }
+  return subdelegator;
+}
+
+export function getDailySubDelegation(
+  fromAddress: Address,
+  toAddress: Address,
+  timestamp: BigInt
+): DailySubDelegation {
+  let timestampInt = timestamp.toI32();
+  let dayId = timestampInt / 86400;
+  let startTimestamp = dayId * 86400;
+  let dailySubDelegationId = `${fromAddress.toHex()}-${toAddress.toHex()}-${dayId.toString()}`;
+  let dailySubDelegation = DailySubDelegation.load(dailySubDelegationId);
+  if (dailySubDelegation == null) {
+    dailySubDelegation = new DailySubDelegation(dailySubDelegationId);
+    dailySubDelegation.from = fromAddress.toHex();
+    dailySubDelegation.to = toAddress.toHex();
+    dailySubDelegation.date = startTimestamp;
+  }
+  return dailySubDelegation;
+}
+
+export function recordSubDelegation(
+  fromAddress: Address,
+  toAddress: Address,
+  rule: SubDelegationRuleObject,
+  contractAddress: Address,
+  blockNumber: BigInt,
+  blockTimestamp: BigInt,
+  transactionHash: Bytes
+): void {
+  // update proxy address
+  getProxyAddress(fromAddress, contractAddress);
+  // save subdelegation entity
+  const entityId = `${transactionHash.toHex()}-${blockNumber.toString()}`;
+  let entity = new SubDelegationEntity(entityId);
+  entity.from = fromAddress.toHex();
+  entity.to = toAddress.toHex();
+  entity.maxRedelegations = rule.maxRedelegations;
+  entity.blocksBeforeVoteCloses = rule.blocksBeforeVoteCloses;
+  entity.notValidBefore = rule.notValidBefore;
+  entity.notValidAfter = rule.notValidAfter;
+  entity.customRule = rule.customRule.toHex();
+  entity.allowanceType = rule.allowanceType;
+  entity.allowance = rule.allowance;
+  entity.blockNumber = blockNumber;
+  entity.blockTimestamp = blockTimestamp;
+  entity.transactionHash = transactionHash.toHex();
+  entity.save();
+  // update subdelegation rule
+  let subdelegator = getSubDelegator(fromAddress, toAddress);
+  subdelegator.maxRedelegations = rule.maxRedelegations;
+  subdelegator.blocksBeforeVoteCloses = rule.blocksBeforeVoteCloses;
+  subdelegator.notValidBefore = rule.notValidBefore;
+  subdelegator.notValidAfter = rule.notValidAfter;
+  subdelegator.customRule = rule.customRule.toHex();
+  subdelegator.allowanceType = rule.allowanceType;
+  subdelegator.allowance = rule.allowance;
+  subdelegator.save();
+  // update daily subdelegation
+  let delegate = getDelegate(toAddress);
+  delegate.save();
+  let dailySubDelegation = getDailySubDelegation(
+    fromAddress,
+    toAddress,
+    blockTimestamp
+  );
+  dailySubDelegation.maxRedelegations = rule.maxRedelegations;
+  dailySubDelegation.blocksBeforeVoteCloses = rule.blocksBeforeVoteCloses;
+  dailySubDelegation.notValidBefore = rule.notValidBefore;
+  dailySubDelegation.notValidAfter = rule.notValidAfter;
+  dailySubDelegation.customRule = rule.customRule.toHex();
+  dailySubDelegation.allowanceType = rule.allowanceType;
+  dailySubDelegation.allowance = rule.allowance;
+  dailySubDelegation.save();
 }
