@@ -73,7 +73,6 @@ def fetch_daily_balances(date: int):
     response = requests.post(url, json=json, headers={"Content-Type": "application/json"})
     data = response.json()
     print(skip)
-    print(data)
     balances = data['data']['dailyBalances']
     for balance in balances:
       balanceObjects.append({
