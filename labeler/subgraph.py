@@ -21,6 +21,7 @@ bucket_name = os.getenv("GCP_BUCKET_NAME")
 bucket = storage_client.bucket(bucket_name)
 
 url = os.getenv("SUBGRAPH_URL")
+api_key = os.getenv("SUBGRAPH_API_KEY")
 daily_balance_table_id = os.getenv("BIGQUERY_DAILY_BALANCE_TABLE_ID")
 daily_delegate_table_id = os.getenv("BIGQUERY_DAILY_DELEGATE_TABLE_ID")
 
@@ -70,7 +71,11 @@ def fetch_daily_balances(date: int):
       "query": query,
       "variables": variables
     }
-    response = requests.post(url, json=json, headers={"Content-Type": "application/json"})
+    header = {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + api_key
+    }
+    response = requests.post(url, json=json, headers=header)
     data = response.json()
     print(skip)
     balances = data['data']['dailyBalances']
@@ -81,7 +86,7 @@ def fetch_daily_balances(date: int):
         "balance": balance['balance']
       })
     skip += 1000
-    sleep(2)
+    sleep(5)
     print(len(balanceObjects))
     if len(balanceObjects) > 0:
       bigquery_client.insert_rows_json(daily_balance_table_id, balanceObjects)
@@ -135,7 +140,11 @@ def fetch_daily_delegates(date: int):
       "query": query,
       "variables": variables
     }
-    response = requests.post(url, json=json, headers={"Content-Type": "application/json"})
+    header = {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + api_key
+    }
+    response = requests.post(url, json=json, headers=header)
     data = response.json()
     print(data)
     delegates = data['data']['dailyDelagates']
@@ -146,7 +155,7 @@ def fetch_daily_delegates(date: int):
         "directVotingPower": delegate['directVotingPower']
       })
     skip += 1000
-    sleep(2)
+    sleep(5)
     print(len(delegatesObjects))
     if len(delegatesObjects) > 0:
       bigquery_client.insert_rows_json(daily_delegate_table_id, delegatesObjects)
