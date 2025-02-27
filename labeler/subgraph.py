@@ -1,12 +1,11 @@
 import requests
-from dotenv import load_dotenv
+import json
 from google.cloud import storage, bigquery
 from google.oauth2 import service_account
 from datetime import datetime, timedelta, timezone, time
 from time import sleep
+from web3 import Web3
 import os
-
-load_dotenv()
 
 info = {
   "project_id": os.getenv("GCP_PROJECT_ID"),
@@ -24,6 +23,12 @@ url = os.getenv("SUBGRAPH_URL")
 api_key = os.getenv("SUBGRAPH_API_KEY")
 daily_balance_table_id = os.getenv("BIGQUERY_DAILY_BALANCE_TABLE_ID")
 daily_delegate_table_id = os.getenv("BIGQUERY_DAILY_DELEGATE_TABLE_ID")
+daily_subdelegate_table_id = os.getenv("BIGQUERY_DAILY_SUBDELEGATE_TABLE_ID")
+web3 = Web3(Web3.HTTPProvider(os.getenv("RPC_URL")))
+alligator_address = Web3.to_checksum_address(os.getenv("ALLIGATOR_ADDRESS"))
+with open('AlligatorOPV5.json') as f:
+  alligator_abi = json.load(f)
+alligator = web3.eth.contract(address=alligator_address, abi=alligator_abi)
 
 def fetch_daily_balances(date: int):
   print(date)
@@ -63,7 +68,7 @@ def fetch_daily_balances(date: int):
     }
     """
     variables = {
-      "datetime": date,
+      "datetime": int(date),
       "skip": skip,
       "last_id": last_id
     }
@@ -132,7 +137,7 @@ def fetch_daily_delegates(date: int):
     }
     """
     variables = {
-      "datetime": date,
+      "datetime": int(date),
       "skip": skip,
       "last_id": last_id
     }
@@ -156,18 +161,161 @@ def fetch_daily_delegates(date: int):
       })
     skip += 1000
     sleep(5)
-    print(len(delegatesObjects))
+    print(skip)
     if len(delegatesObjects) > 0:
       bigquery_client.insert_rows_json(daily_delegate_table_id, delegatesObjects)
       last_id = delegates[-1]['id']
     if len(delegates) < 1000:
       break
 
-startTimestamp = 1650931200
-endTimestamp = 1735084800
-startDate = datetime.fromtimestamp(startTimestamp, timezone.utc)
-endDate = datetime.fromtimestamp(endTimestamp, timezone.utc)
-while startDate <= endDate:
-  date = startDate.timestamp()
-  fetch_daily_balances(date)
-  startDate += timedelta(days=1)
+def fetch_daily_subdelegates(date: int):
+  print(date)
+  # check and create table if not exists
+  try:
+    table = bigquery_client.get_table(daily_subdelegate_table_id)
+  except:
+    schema = [
+      bigquery.SchemaField("date", "DATE", mode="REQUIRED"),
+      bigquery.SchemaField("from", "STRING", mode="REQUIRED"),
+      bigquery.SchemaField("to", "STRING", mode="REQUIRED"),
+      bigquery.SchemaField("maxRedelegations", "INT64", mode="REQUIRED"),
+      bigquery.SchemaField("blocksBeforeVoteCloses", "INT64", mode="REQUIRED"),
+      bigquery.SchemaField("notValidBefore", "INT64", mode="REQUIRED"),
+      bigquery.SchemaField("notValidAfter", "INT64", mode="REQUIRED"),
+      bigquery.SchemaField("customRule", "STRING", mode="REQUIRED"),
+      bigquery.SchemaField("allowanceType", "INT64", mode="REQUIRED"),
+      bigquery.SchemaField("allowance", "STRING", mode="REQUIRED")
+    ]
+    partition = bigquery.TimePartitioning(
+      bigquery.TimePartitioningType.DAY,
+      "date"
+    )
+    table = bigquery.Table(daily_subdelegate_table_id, schema=schema)
+    table.time_partitioning = partition
+    table.clustering_fields = ["from", "to"]
+    table = bigquery_client.create_table(table)
+  # delete existing data
+  dateString = datetime.fromtimestamp(date, timezone.utc).strftime("%Y-%m-%d")
+  bigquery_client.query(f"DELETE FROM `{daily_subdelegate_table_id}` WHERE date = '{dateString}'")
+  # query from subgraph
+  skip = 0
+  last_id = ""
+  while True:
+    subdelegatesObjects = []
+    query = """
+    query getDailySubdelegates($datetime: Int!, $skip: Int!, $last_id: String) {
+      dailySubDelegations(where:{date: $datetime, id_gt: $last_id }, orderBy: id, orderDirection: asc, first:1000) {
+        id
+        date
+        from
+        to
+        maxRedelegations
+        blocksBeforeVoteCloses
+        notValidBefore
+        notValidAfter
+        customRule
+        allowanceType
+        allowance
+      }
+    }
+    """
+    variables = {
+      "datetime": int(date),
+      "skip": skip,
+      "last_id": last_id
+    }
+    json = {
+      "query": query,
+      "variables": variables
+    }
+    header = {
+      "Content-Type": "application/json",
+      "Authorization": "Bearer " + api_key
+    }
+    response = requests.post(url, json=json, headers=header)
+    data = response.json()
+    subdelegates = data['data']['dailySubDelegations']
+    for subdelegate in subdelegates:
+      subdelegatesObjects.append({
+        "date": datetime.fromtimestamp(subdelegate['date'], timezone.utc).strftime("%Y-%m-%d") ,
+        "from": subdelegate['from'],
+        "to": subdelegate['to'],
+        "maxRedelegations": int(subdelegate['maxRedelegations']),
+        "blocksBeforeVoteCloses": int(subdelegate['blocksBeforeVoteCloses']),
+        "notValidBefore": int(subdelegate['notValidBefore']),
+        "notValidAfter": int(subdelegate['notValidAfter']),
+        "customRule": subdelegate['customRule'],
+        "allowanceType": int(subdelegate['allowanceType']),
+        "allowance": subdelegate['allowance']
+      })
+    skip += 1000
+    sleep(5)
+    print(skip)
+    if len(subdelegatesObjects) > 0:
+      bigquery_client.insert_rows_json(daily_subdelegate_table_id, subdelegatesObjects)
+      last_id = subdelegates[-1]['id']
+    if len(subdelegates) < 1000:
+      break
+
+def query_delegates(date_str: str):
+  query = f"""
+  WITH RankedDelegates AS (
+  SELECT
+    delegate,
+    directVotingPower,
+    date,
+    ROW_NUMBER() OVER (PARTITION BY delegate ORDER BY date DESC) AS rn
+  FROM `{daily_delegate_table_id}`
+  WHERE date <= '{date_str}')
+  SELECT
+    delegate,
+    directVotingPower,
+    date
+  FROM RankedDelegates
+  WHERE rn = 1
+  and directVotingPower != '0'
+  order by SAFE_CAST(directVotingPower as decimal) desc
+  """
+  query_job = bigquery_client.query(query)
+  df = query_job.to_dataframe()
+  return df
+
+def query_subdelegates(date_str: str):
+  query = f"""
+  WITH RankedSubdelegate AS (
+  SELECT
+    `from`,
+    `to`,
+    maxRedelegations,
+    blocksBeforeVoteCloses,
+    notValidBefore,
+    notValidAfter,
+    customRule,
+    allowanceType,
+    allowance,
+    date,
+    ROW_NUMBER() OVER (PARTITION BY concat(`from`,`to`) ORDER BY date DESC) AS rn
+  FROM `{daily_subdelegate_table_id}`
+  where date <= '{date_str}')
+  SELECT
+    `from`,
+    `to`,
+    maxRedelegations,
+    blocksBeforeVoteCloses,
+    notValidBefore,
+    notValidAfter,
+    customRule,
+    allowanceType,
+    allowance,
+    date
+  FROM RankedSubdelegate
+  WHERE rn = 1
+  order by `from` asc, date asc, `to` asc
+  """
+  query_job = bigquery_client.query(query)
+  df = query_job.to_dataframe()
+  return df
+
+def get_proxy_address(owner: str):
+  address = alligator.functions.proxyAddress(Web3.to_checksum_address(owner)).call()
+  return address.lower()
