@@ -48,7 +48,7 @@ def execute(date):
   print('execute')
   # update data first
   begin_of_day = datetime.combine(date, time.min)
-  data_date = (date - timedelta(days=1))
+  data_date = (begin_of_day - timedelta(days=1))
   data_date_str = data_date.strftime("%Y-%m-%d")
   delegates_df = query_delegates(data_date_str)
   fetch_daily_delegates(data_date.timestamp())
@@ -75,7 +75,7 @@ def execute(date):
   # write json file
   all_df = pd.DataFrame(delegates)
   all_df.to_json('delegates_without_partial_vp.json', orient='records')
-  blob = bucket.blob(f'mvp/{data_date_str}/delegates_without_partial_vp.json')
+  blob = bucket.blob(f'mvp/{date.strftime("%Y-%m-%d")}/delegates_without_partial_vp.json')
   blob.upload_from_filename('delegates_without_partial_vp.json')
   blob.make_public()
   os.remove('delegates_without_partial_vp.json')
@@ -161,7 +161,7 @@ def execute(date):
     rank += 1
   df = pd.DataFrame(all_delegates)
   df.to_json('delegates_with_partial_vp.json', orient='records')
-  blob = bucket.blob(f'mvp/{data_date_str}/delegates_with_partial_vp.json')
+  blob = bucket.blob(f'mvp/{date.strftime("%Y-%m-%d")}/delegates_with_partial_vp.json')
   blob.upload_from_filename('delegates_with_partial_vp.json')
   blob.make_public()
   os.remove('delegates_with_partial_vp.json')
