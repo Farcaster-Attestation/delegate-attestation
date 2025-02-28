@@ -44,20 +44,11 @@ bucket = storage_client.bucket(bucket_name)
 
 app = FastAPI()
 
-@app.post("/fetch:{date}")
-def fetch(date: str):
-  print('fetch')
-  data_date = datetime.strptime(date, "%Y-%m-%d")
-  fetch_daily_delegates(data_date.timestamp())
-  fetch_daily_subdelegates(data_date.timestamp())
-
-@app.post("/execute")
-def execute():
+def execute(date):
   print('execute')
   # update data first
-  current = datetime.now(timezone.utc)
-  begin_of_day = datetime.combine(current, time.min)
-  data_date = (begin_of_day - timedelta(days=1))
+  begin_of_day = datetime.combine(date, time.min)
+  data_date = (date - timedelta(days=1))
   data_date_str = data_date.strftime("%Y-%m-%d")
   delegates_df = query_delegates(data_date_str)
   fetch_daily_delegates(data_date.timestamp())
@@ -78,7 +69,7 @@ def execute():
       'delegate': row.delegate,
       'amount': row.directVotingPower,
       'date': data_date.strftime("%Y-%m-%d"),
-      'fetch_timestamp': current.strftime("%Y-%m-%d %H:%M:%S %Z%z")
+      'fetch_timestamp': date.strftime("%Y-%m-%d %H:%M:%S %Z%z")
     })
     rank += 1
   # write json file
@@ -148,7 +139,7 @@ def execute():
       'advancedVotingPower': delegate_map[delegate]['advancedVotingPower'] / 1e18,
       'totalVotingPower': (delegate_map[delegate]['directVotingPower'] + delegate_map[delegate]['tempVotingPower'])/1e18,
       'date': data_date.strftime("%Y-%m-%d"),
-      'fetch_timestamp': current.strftime("%Y-%m-%d %H:%M:%S %Z%z")
+      'fetch_timestamp': date.strftime("%Y-%m-%d %H:%M:%S %Z%z")
     })
   df = pd.DataFrame(advanced_delegates)
   con = duckdb.connect()
@@ -165,7 +156,7 @@ def execute():
       'partial_vp': delegate['advancedVotingPower'],
       'voting_power': delegate['totalVotingPower'],
       'date': data_date.strftime("%Y-%m-%d"),
-      'fetch_timestamp': current.strftime("%Y-%m-%d %H:%M:%S %Z%z")
+      'fetch_timestamp': date.strftime("%Y-%m-%d %H:%M:%S %Z%z")
     })
     rank += 1
   df = pd.DataFrame(all_delegates)
@@ -189,7 +180,7 @@ def execute():
   }
   with open('attestation_without_partial_vp.json', 'w') as f:
     json.dump(attestation_info, f)
-  blob = bucket.blob(f'mvp/{current.strftime("%Y-%m-%d")}/attestation_without_partial_vp.json')
+  blob = bucket.blob(f'mvp/{date.strftime("%Y-%m-%d")}/attestation_without_partial_vp.json')
   blob.upload_from_filename('attestation_without_partial_vp.json')
   blob.make_public()
   os.remove('attestation_without_partial_vp.json')
@@ -206,13 +197,30 @@ def execute():
   }
   with open('attestation_with_partial_vp.json', 'w') as f:
     json.dump(attestation_info, f)
-  blob = bucket.blob(f'mvp/{current.strftime("%Y-%m-%d")}/attestation_with_partial_vp.json')
+  blob = bucket.blob(f'mvp/{date.strftime("%Y-%m-%d")}/attestation_with_partial_vp.json')
   blob.upload_from_filename('attestation_with_partial_vp.json')
   blob.make_public()
   os.remove('attestation_with_partial_vp.json')
 
   with open('checkpoint.txt', 'w') as f:
-    f.write(current.strftime("%Y-%m-%d"))
+    f.write(date.strftime("%Y-%m-%d"))
   blob = bucket.blob('mvp/checkpoint.txt')
   blob.upload_from_filename('checkpoint.txt')
   os.remove('checkpoint.txt')
+
+@app.post("/fetch/:{date}")
+def handle_fetch(date: str):
+  print('fetch')
+  data_date = datetime.strptime(date, "%Y-%m-%d")
+  fetch_daily_delegates(data_date.timestamp())
+  fetch_daily_subdelegates(data_date.timestamp())
+
+@app.post("/execute")
+def handle_execute():
+  current = datetime.now(timezone.utc)
+  execute(current)
+
+@app.post("/execute/:{date}")
+def handle_execute(date: str):
+  current = datetime.strptime(date, "%Y-%m-%d")
+  execute(current)
