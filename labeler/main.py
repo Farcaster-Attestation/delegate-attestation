@@ -44,6 +44,13 @@ bucket = storage_client.bucket(bucket_name)
 
 app = FastAPI()
 
+@app.post("/fetch:{date}")
+def fetch(date: str):
+  print('fetch')
+  data_date = datetime.strptime(date, "%Y-%m-%d")
+  fetch_daily_delegates(data_date.timestamp())
+  fetch_daily_subdelegates(data_date.timestamp())
+
 @app.post("/execute")
 def execute():
   print('execute')
