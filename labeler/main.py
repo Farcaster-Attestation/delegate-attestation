@@ -1,4 +1,5 @@
 import os
+import pytz
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -221,4 +222,5 @@ def handle_execute():
 @app.post("/execute/:{date}")
 def handle_execute(date: str):
   current = datetime.strptime(date, "%Y-%m-%d")
+  current = pytz.timezone('UTC').localize(current)
   execute(current)
