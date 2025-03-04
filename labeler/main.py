@@ -51,8 +51,8 @@ def execute(date):
   data_date = (begin_of_day - timedelta(days=1))
   data_date_str = data_date.strftime("%Y-%m-%d")
   delegates_df = query_delegates(data_date_str)
-  # fetch_daily_delegates(data_date.timestamp())
-  # fetch_daily_subdelegates(data_date.timestamp())
+  fetch_daily_delegates(data_date.timestamp())
+  fetch_daily_subdelegates(data_date.timestamp())
   # load checkpoint
   checkpoint_blob = bucket.blob('mvp/checkpoint.txt')
   checkpoint = ''
@@ -75,9 +75,9 @@ def execute(date):
   # write json file
   all_df = pd.DataFrame(delegates)
   all_df.to_json('delegates_without_partial_vp.json', orient='records')
-  # blob = bucket.blob(f'mvp/{date.strftime("%Y-%m-%d")}/delegates_without_partial_vp.json')
-  # blob.upload_from_filename('delegates_without_partial_vp.json')
-  # blob.make_public()
+  blob = bucket.blob(f'mvp/{date.strftime("%Y-%m-%d")}/delegates_without_partial_vp.json')
+  blob.upload_from_filename('delegates_without_partial_vp.json')
+  blob.make_public()
   os.remove('delegates_without_partial_vp.json')
   # calculate with advanced voting power
   ## get subdelegations
@@ -92,13 +92,11 @@ def execute(date):
       'tempVotingPower': int(row.directVotingPower)
     }
   for subdelegate in all_subdelegations:
-    # print(subdelegate)
     from_address = subdelegate['from']
     if from_address not in proxy_map:
       proxy_address = get_proxy_address(from_address)
       proxy_map[from_address] = proxy_address
     proxy_address = proxy_map[from_address]
-    # print(proxy_address)
     if proxy_address not in delegate_map:
       delegate_map[proxy_address] = {
         'directVotingPower': 0,
@@ -161,9 +159,9 @@ def execute(date):
     rank += 1
   df = pd.DataFrame(all_delegates)
   df.to_json('delegates_with_partial_vp.json', orient='records')
-  # blob = bucket.blob(f'mvp/{date.strftime("%Y-%m-%d")}/delegates_with_partial_vp.json')
-  # blob.upload_from_filename('delegates_with_partial_vp.json')
-  # blob.make_public()
+  blob = bucket.blob(f'mvp/{date.strftime("%Y-%m-%d")}/delegates_with_partial_vp.json')
+  blob.upload_from_filename('delegates_with_partial_vp.json')
+  blob.make_public()
   os.remove('delegates_with_partial_vp.json')
 
   # prepare list of delegates by comparing with latest checkpoint

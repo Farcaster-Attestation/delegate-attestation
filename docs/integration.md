@@ -52,7 +52,7 @@ query Attestations {
     },
     {
       attester: {
-        equals: "0xD49CCff3DA665c126Bf1399a6084835ec057e7A3"
+        equals: "0x359F56AE92F4C3074E7466eD7693CC4715217f74"
       }
     }]}) {
     id,
