@@ -1,12 +1,17 @@
 import os
+import pytz
 from dotenv import load_dotenv
+load_dotenv()
+
 from google.cloud import storage, bigquery
 from google.oauth2 import service_account
 from datetime import datetime, timedelta, timezone, time
 import pandas as pd
 import requests
 import json
+import duckdb
 from fastapi import FastAPI
+from subgraph import query_delegates, query_subdelegates, get_proxy_address, fetch_daily_delegates, fetch_daily_subdelegates
 
 def save_to_storage(datetime,filename, delegates, bucket):
   df = pd.DataFrame(delegates)
@@ -40,67 +45,126 @@ bucket = storage_client.bucket(bucket_name)
 
 app = FastAPI()
 
-@app.post("/execute")
-def execute():
+def execute(date):
   print('execute')
+  # update data first
+  begin_of_day = datetime.combine(date, time.min)
+  data_date = (begin_of_day - timedelta(days=1))
+  data_date_str = data_date.strftime("%Y-%m-%d")
+  delegates_df = query_delegates(data_date_str)
+  fetch_daily_delegates(data_date.timestamp())
+  fetch_daily_subdelegates(data_date.timestamp())
+  # load checkpoint
   checkpoint_blob = bucket.blob('mvp/checkpoint.txt')
   checkpoint = ''
   if checkpoint_blob.exists():
     checkpoint = checkpoint_blob.download_as_string().decode('utf-8')
-  # query from bigquery
-  query = """
-    SELECT delegate,sum(cast(amount as numeric)) as voting_power FROM `curia-dao.curia_op_indexer.holders` where delegate is not null group by delegate order by sum(cast(amount as numeric)) desc limit 100
-  """
-  query_job = bigquery_client.query(query)
+  # calculate direct voting power
   delegates = []
   rank = 1
-  current = datetime.now(timezone.utc)
-  begin_of_day = datetime.combine(current, time.min)
-  data_date = (begin_of_day - timedelta(days=1))
-  for row in query_job:
+  for row in delegates_df.itertuples():
+    if rank > 100:
+      break
     delegates.append({
       'rank': rank,
-      'delegate': row[0],
-      'amount': str(row[1]),
+      'delegate': row.delegate,
+      'amount': row.directVotingPower,
       'date': data_date.strftime("%Y-%m-%d"),
-      'fetch_timestamp': current.strftime("%Y-%m-%d %H:%M:%S %Z%z")
+      'fetch_timestamp': date.strftime("%Y-%m-%d %H:%M:%S %Z%z")
     })
     rank += 1
   # write json file
-  df = pd.DataFrame(delegates)
-  df.to_json('delegates_without_partial_vp.json', orient='records')
-  blob = bucket.blob(f'mvp/{current.strftime("%Y-%m-%d")}/delegates_without_partial_vp.json')
+  all_df = pd.DataFrame(delegates)
+  all_df.to_json('delegates_without_partial_vp.json', orient='records')
+  blob = bucket.blob(f'mvp/{date.strftime("%Y-%m-%d")}/delegates_without_partial_vp.json')
   blob.upload_from_filename('delegates_without_partial_vp.json')
   blob.make_public()
   os.remove('delegates_without_partial_vp.json')
-  # call curia api
-  params = {
-    'limit': 100,
-    'page': 1,
-    'sort': 'delegateToken',
-    'isAsc': 'false'
-  }
-  url = 'https://prod.op.api.curiahub.xyz/api/delegates'
-  results = requests.get(url, params=params).json()
-  all_delegates = []
-  for delegate in results['delegates']:
-    all_delegates.append({
-      'rank': delegate['delegateRank'],
-      'delegate': delegate['delegateAddress'],
-      'ens_address': delegate['ensAddress'],
-      'voting_power': delegate['delegateToken'],
-      'vp': delegate['legacyDelegate'],
-      'partial_vp': delegate['partialDelegate'],
+  # calculate with advanced voting power
+  ## get subdelegations
+  subdelegations_df = query_subdelegates(data_date_str)
+  all_subdelegations = subdelegations_df.to_dict(orient='records')
+  delegate_map = {}
+  proxy_map = {}
+  for row in delegates_df.itertuples():
+    delegate_map[row.delegate] = {
+      'directVotingPower': int(row.directVotingPower),
+      'advancedVotingPower': 0,
+      'tempVotingPower': int(row.directVotingPower)
+    }
+  for subdelegate in all_subdelegations:
+    from_address = subdelegate['from']
+    if from_address not in proxy_map:
+      proxy_address = get_proxy_address(from_address)
+      proxy_map[from_address] = proxy_address
+    proxy_address = proxy_map[from_address]
+    if proxy_address not in delegate_map:
+      delegate_map[proxy_address] = {
+        'directVotingPower': 0,
+        'advancedVotingPower': 0,
+        'tempVotingPower': 0
+      }
+    if subdelegate['to'] not in delegate_map:
+      delegate_map[subdelegate['to']] = {
+        'directVotingPower': 0,
+        'advancedVotingPower': 0,
+        'tempVotingPower': 0
+      }
+    source_delegate = delegate_map[proxy_address]
+    target_delegate = delegate_map[subdelegate['to']]
+    allowance_type = subdelegate['allowanceType']
+    allowance = int(subdelegate['allowance'])
+    if allowance_type == 0:
+      # absolute
+      delegated_vp = min(allowance, source_delegate['tempVotingPower'])
+      target_delegate['advancedVotingPower'] += delegated_vp
+      source_delegate['tempVotingPower'] -= delegated_vp
+    else:
+      # relative
+      delegated_vp = 0
+      if allowance > 100000:
+        delegated_vp = source_delegate['tempVotingPower']
+      else:
+        delegated_vp = source_delegate['directVotingPower'] * allowance / 100000
+        delegated_vp = min(delegated_vp, source_delegate['tempVotingPower'])
+      target_delegate['advancedVotingPower'] += delegated_vp
+      source_delegate['tempVotingPower'] -= delegated_vp
+    
+  advanced_delegates = []
+  for delegate in delegate_map:
+    advanced_delegates.append({
+      'delegate': delegate,
+      'directVotingPower': delegate_map[delegate]['directVotingPower'] / 1e18,
+      'advancedVotingPower': delegate_map[delegate]['advancedVotingPower'] / 1e18,
+      'totalVotingPower': (delegate_map[delegate]['directVotingPower'] + delegate_map[delegate]['tempVotingPower'])/1e18,
       'date': data_date.strftime("%Y-%m-%d"),
-      'fetch_timestamp': current.strftime("%Y-%m-%d %H:%M:%S %Z%z")
+      'fetch_timestamp': date.strftime("%Y-%m-%d %H:%M:%S %Z%z")
     })
-  # write json file
+  df = pd.DataFrame(advanced_delegates)
+  con = duckdb.connect()
+  con.execute("CREATE TABLE delegates as select * from df")
+  results = con.execute("SELECT * FROM delegates order by cast(totalVotingPower as double) desc limit 100")
+  temp_delegates = results.fetchdf().to_dict(orient='records')
+  all_delegates = []
+  rank = 1
+  for delegate in temp_delegates:
+    all_delegates.append({
+      'rank': rank,
+      'delegate': delegate['delegate'],
+      'vp': delegate['directVotingPower'],
+      'partial_vp': delegate['advancedVotingPower'],
+      'voting_power': delegate['totalVotingPower'],
+      'date': data_date.strftime("%Y-%m-%d"),
+      'fetch_timestamp': date.strftime("%Y-%m-%d %H:%M:%S %Z%z")
+    })
+    rank += 1
   df = pd.DataFrame(all_delegates)
   df.to_json('delegates_with_partial_vp.json', orient='records')
-  blob = bucket.blob(f'mvp/{current.strftime("%Y-%m-%d")}/delegates_with_partial_vp.json')
+  blob = bucket.blob(f'mvp/{date.strftime("%Y-%m-%d")}/delegates_with_partial_vp.json')
   blob.upload_from_filename('delegates_with_partial_vp.json')
   blob.make_public()
   os.remove('delegates_with_partial_vp.json')
+
   # prepare list of delegates by comparing with latest checkpoint
   checkpoint_delegates_json = []
   if checkpoint != '':
@@ -115,7 +179,7 @@ def execute():
   }
   with open('attestation_without_partial_vp.json', 'w') as f:
     json.dump(attestation_info, f)
-  blob = bucket.blob(f'mvp/{current.strftime("%Y-%m-%d")}/attestation_without_partial_vp.json')
+  blob = bucket.blob(f'mvp/{date.strftime("%Y-%m-%d")}/attestation_without_partial_vp.json')
   blob.upload_from_filename('attestation_without_partial_vp.json')
   blob.make_public()
   os.remove('attestation_without_partial_vp.json')
@@ -132,13 +196,31 @@ def execute():
   }
   with open('attestation_with_partial_vp.json', 'w') as f:
     json.dump(attestation_info, f)
-  blob = bucket.blob(f'mvp/{current.strftime("%Y-%m-%d")}/attestation_with_partial_vp.json')
+  blob = bucket.blob(f'mvp/{date.strftime("%Y-%m-%d")}/attestation_with_partial_vp.json')
   blob.upload_from_filename('attestation_with_partial_vp.json')
   blob.make_public()
   os.remove('attestation_with_partial_vp.json')
 
   with open('checkpoint.txt', 'w') as f:
-    f.write(current.strftime("%Y-%m-%d"))
+    f.write(date.strftime("%Y-%m-%d"))
   blob = bucket.blob('mvp/checkpoint.txt')
   blob.upload_from_filename('checkpoint.txt')
   os.remove('checkpoint.txt')
+
+@app.post("/fetch/:{date}")
+def handle_fetch(date: str):
+  print('fetch')
+  data_date = datetime.strptime(date, "%Y-%m-%d")
+  fetch_daily_delegates(data_date.timestamp())
+  fetch_daily_subdelegates(data_date.timestamp())
+
+@app.post("/execute")
+def handle_execute():
+  current = datetime.now(timezone.utc)
+  execute(current)
+
+@app.post("/execute/:{date}")
+def handle_execute(date: str):
+  current = datetime.strptime(date, "%Y-%m-%d")
+  current = pytz.timezone('UTC').localize(current)
+  execute(current)

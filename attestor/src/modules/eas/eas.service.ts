@@ -94,13 +94,10 @@ export class EASService {
         tx: null,
       };
     });
-    return results
+    return results;
   }
 
-  async mockRevoke(
-    schemaId: string,
-    easIds: string[],
-  ): Promise<string> {
+  async mockRevoke(schemaId: string, easIds: string[]): Promise<string> {
     return '0x' + Math.random().toString(16).slice(2);
   }
 
@@ -135,14 +132,14 @@ export class EASService {
       }
       return data;
     });
-    console.log('before attest')
+    console.log('before attest');
     const tx = await this.eas.multiAttest([
       {
         schema: schemaId,
         data: datas,
       },
     ]);
-    console.log('waiting')
+    console.log('waiting');
     await tx.wait();
     const logs = tx.receipt.logs;
     const results = logs.map((log) => {
@@ -156,21 +153,20 @@ export class EASService {
     return results;
   }
 
-  async multipleRevoke(
-    schemaId: string,
-    easIds: string[],
-  ): Promise<string> {
+  async multipleRevoke(schemaId: string, easIds: string[]): Promise<string> {
     // get schema
     const datas = easIds.map((easId) => {
       return {
         uid: easId,
       };
     });
-    const tx = await this.eas.multiRevoke([{
-      schema: schemaId,
-      data: datas,
-    }])
-    await tx.wait()
+    const tx = await this.eas.multiRevoke([
+      {
+        schema: schemaId,
+        data: datas,
+      },
+    ]);
+    await tx.wait();
     return tx.receipt.hash;
   }
 }

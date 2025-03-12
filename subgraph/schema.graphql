@@ -1,0 +1,108 @@
+type Account @entity {
+  id: ID!
+  address: String!
+  balance: BigInt!
+  delegatedTo: Delegate
+}
+
+type Delegate @entity {
+  id: ID!
+  address: String!
+  directVotingPower: BigInt!
+  delegators: [Account]! @derivedFrom(field: "delegatedTo")
+  subdelegators: [SubDelegator]! @derivedFrom(field: "to")
+}
+
+type DelegateChanged @entity {
+  id: ID!
+  delegator: String! # address
+  fromDelegate: String!
+  toDelegate: String!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type DelegateVotesChanged @entity {
+  id: ID!
+  delegate: String!
+  previousBalance: BigInt!
+  newBalance: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type Transfer @entity {
+  id: ID!
+  from: String!
+  to: String!
+  value: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type ProxyAddress @entity {
+  id: ID!
+  address: String!
+  proxy: String!
+}
+
+type SubDelegationEntity @entity {
+  id: ID!
+  from: String!
+  to: String!
+  maxRedelegations: Int!
+  blocksBeforeVoteCloses: Int!
+  notValidBefore: BigInt!
+  notValidAfter: BigInt!
+  customRule: String!
+  allowanceType: Int!
+  allowance: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  transactionHash: String!
+}
+
+type SubDelegator @entity {
+  id: ID!
+  from: String!
+  to: Delegate
+  maxRedelegations: Int!
+  blocksBeforeVoteCloses: Int!
+  notValidBefore: BigInt!
+  notValidAfter: BigInt!
+  customRule: String!
+  allowanceType: Int!
+  allowance: BigInt!
+}
+
+# aggregate types
+type DailyDelagate @entity {
+  id: ID!
+  date: Int!
+  delegate: String!
+  directVotingPower: BigInt!
+}
+
+type DailyBalance @entity {
+  id: ID!
+  date: Int!
+  account: String!
+  balance: BigInt!
+}
+
+type DailySubDelegation @entity {
+  id: ID!
+  date: Int!
+  from: String!
+  to: String!
+  maxRedelegations: Int!
+  blocksBeforeVoteCloses: Int!
+  notValidBefore: BigInt!
+  notValidAfter: BigInt!
+  customRule: String!
+  allowanceType: Int!
+  allowance: BigInt!
+}
