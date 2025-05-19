@@ -3,4 +3,4 @@ forge-std/=lib/forge-std/src/
 @eas/contracts/=lib/eas-contracts/contracts/
 @dynamic-attestation/src/=src/
 @dynamic-attestation/test/=test/
-optimism-governor=lib/optimism-governor/src
+optimism-governor=lib/optimism-governor
