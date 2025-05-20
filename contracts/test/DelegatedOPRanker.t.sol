@@ -3,6 +3,9 @@ pragma solidity ^0.8.0;
 
 import {Test} from "forge-std/Test.sol";
 import {DelegatedOPRanker} from "../src/DelegatedOPRanker.sol";
+import {ISchemaResolver} from "@eas/contracts/resolver/ISchemaResolver.sol";
+import {ISchemaRegistry, SchemaRegistry} from "@eas/contracts/SchemaRegistry.sol";
+import {IEAS, EAS, AttestationRequest, AttestationRequestData, Attestation, RevocationRequestData, RevocationRequest} from "@eas/contracts/EAS.sol";
 
 contract MockDelegatedOP {
     mapping(address => uint256) private votes;
@@ -17,6 +20,8 @@ contract MockDelegatedOP {
 }
 
 contract DelegatedOPRankerTest is Test {
+    IEAS public eas;
+    ISchemaRegistry public schemaRegistry;
     DelegatedOPRanker public ranker;
     MockDelegatedOP public mockDelegatedOP;
     address public alice = makeAddr("alice");
@@ -27,7 +32,11 @@ contract DelegatedOPRankerTest is Test {
 
     function setUp() public {
         mockDelegatedOP = new MockDelegatedOP();
-        ranker = new DelegatedOPRanker(address(mockDelegatedOP), 4); // Set max ranks to 4
+        schemaRegistry = new SchemaRegistry();
+        eas = new EAS(schemaRegistry);
+
+        ranker = new DelegatedOPRanker(eas, address(mockDelegatedOP), 4); // Set max ranks to 4
+        ranker.initialize();
     }
 
     function test_InitialState() public {
