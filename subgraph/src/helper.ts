@@ -56,7 +56,10 @@ export function getDelegate(address: Address): Delegate {
   if (delegate == null) {
     delegate = new Delegate(delegateId);
     delegate.address = address.toHex();
+    delegate.totalVotingPower = new BigInt(0);
     delegate.directVotingPower = new BigInt(0);
+    delegate.subVotingPower = new BigInt(0);
+    delegate.isProxy = false;
   }
   return delegate;
 }
@@ -126,6 +129,11 @@ export function getProxyAddress(
     proxyAddress.address = address.toHex();
     proxyAddress.proxy = proxy.toHex();
     proxyAddress.save();
+
+    const delegate = getDelegate(proxy);
+    delegate.proxyOf = address.toHex();
+    delegate.isProxy = true;
+    delegate.save();
   }
   return proxyAddress;
 }
@@ -158,6 +166,39 @@ export function getDailySubDelegation(
     dailySubDelegation.date = startTimestamp;
   }
   return dailySubDelegation;
+}
+
+export function updateSubDelegatorVotingPower(
+  subdelegator: SubDelegator,
+  blockTimestamp: BigInt
+): void {
+  let subVotingPower = new BigInt(0);
+
+  if (
+    subdelegator.notValidAfter.notEqual(BigInt.zero()) &&
+    blockTimestamp.ge(subdelegator.notValidBefore) &&
+    blockTimestamp.le(subdelegator.notValidAfter)
+  ) {
+    subVotingPower = subdelegator.allowance;
+  }
+
+  // update delegate voting power
+  let delegate = getDelegate(Address.fromHexString(subdelegator.to!));
+  if (subVotingPower.gt(subdelegator.votingPower)) {
+    let delta = subVotingPower.minus(subdelegator.votingPower);
+    delegate.subVotingPower = delegate.subVotingPower.plus(delta);
+  } else {
+    let delta = subdelegator.votingPower.minus(subVotingPower);
+    delegate.subVotingPower = delegate.subVotingPower.minus(delta);
+  }
+  delegate.totalVotingPower = delegate.totalVotingPower.plus(
+    delegate.subVotingPower
+  );
+  delegate.save();
+
+  // update subdelegator voting power
+  subdelegator.votingPower = subVotingPower;
+  subdelegator.save();
 }
 
 export function recordSubDelegation(
@@ -196,10 +237,9 @@ export function recordSubDelegation(
   subdelegator.customRule = rule.customRule.toHex();
   subdelegator.allowanceType = rule.allowanceType;
   subdelegator.allowance = rule.allowance;
-  subdelegator.save();
+  updateSubDelegatorVotingPower(subdelegator, blockTimestamp);
+
   // update daily subdelegation
-  let delegate = getDelegate(toAddress);
-  delegate.save();
   let dailySubDelegation = getDailySubDelegation(
     fromAddress,
     toAddress,

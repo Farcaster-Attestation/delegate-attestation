@@ -6,12 +6,9 @@ import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {Initializable} from "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import {IEAS, Attestation, AttestationRequest, AttestationRequestData, RevocationRequest, RevocationRequestData} from "@eas/contracts/IEAS.sol";
 import {SchemaResolver, ISchemaResolver} from "@eas/contracts/resolver/SchemaResolver.sol";
+import {IDelegatedOP, DelegateStatus} from "./IDelegatedOP.sol";
 
 bytes32 constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
-
-interface IDelegatedOP {
-    function getVotes(address account) external view returns (uint256);
-}
 
 contract DelegatedOPRanker is
     AccessControl,
@@ -129,7 +126,10 @@ contract DelegatedOPRanker is
     function updateRank(address account) public {
         uint256 delegation = IDelegatedOP(delegatedOP).getVotes(account);
         uint256 currentRank = getRank(account);
-        uint256 newRank = getRankByDelegation(delegation);
+        uint256 newRank = IDelegatedOP(delegatedOP).status(account) ==
+            DelegateStatus.NORMAL
+            ? getRankByDelegation(delegation)
+            : 0;
 
         if (newRank == 0) {
             if (currentRank == 0) {
@@ -190,14 +190,14 @@ contract DelegatedOPRanker is
 
     function onAttest(
         Attestation calldata attestation,
-        uint256 value
+        uint256
     ) internal view override returns (bool) {
         return attestation.attester == address(this);
     }
 
     function onRevoke(
         Attestation calldata attestation,
-        uint256 value
+        uint256
     ) internal view override returns (bool) {
         return attestation.attester == address(this);
     }

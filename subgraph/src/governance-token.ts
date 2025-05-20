@@ -16,6 +16,7 @@ import {
   getDailyDelegate,
   ZERO_ADDRESS,
   updateDailyBalance,
+  updateSubDelegatorVotingPower,
 } from "./helper";
 
 export function handleDelegateChanged(event: DelegateChangedEvent): void {
@@ -56,11 +57,25 @@ export function handleDelegateVotesChanged(
   // update delegate voting power
   let delegateEntity = getDelegate(delegate);
   delegateEntity.directVotingPower = newBalance;
+  delegateEntity.totalVotingPower = delegateEntity.directVotingPower.plus(
+    delegateEntity.subVotingPower
+  );
   delegateEntity.save();
   // update daily delegate
   let dailyDelegate = getDailyDelegate(delegate, event.block.timestamp);
   dailyDelegate.directVotingPower = newBalance;
   dailyDelegate.save();
+
+  // update subdelegator voting power if it's a proxy
+  if (delegateEntity.isProxy && delegateEntity.proxyOf) {
+    const ownerDelegate = getDelegate(
+      Address.fromHexString(delegateEntity.proxyOf)
+    );
+    const subdelegatees = ownerDelegate.subdelegatees.load();
+    for (let i = 0; i < subdelegatees.length; i++) {
+      updateSubDelegatorVotingPower(subdelegatees[i], event.block.timestamp);
+    }
+  }
 }
 
 export function handleTransfer(event: TransferEvent): void {

@@ -7,6 +7,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {IAlligatorOP} from "optimism-governor/src/interfaces/IAlligatorOP.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
+import {IDelegatedOP, DelegateStatus} from "./IDelegatedOP.sol";
 
 address constant OP_ADDRESS = 0x4200000000000000000000000000000000000042;
 address constant ALIGATOR_ADDRESS = 0x7f08F3095530B67CdF8466B7a923607944136Df0;
@@ -31,7 +32,7 @@ interface IAlligatorOPSubdelegation {
         );
 }
 
-contract DelegatedOP is AccessControl, Multicall {
+contract DelegatedOP is IDelegatedOP, AccessControl, Multicall {
     using EnumerableSet for EnumerableSet.AddressSet;
 
     // from => total
@@ -43,20 +44,8 @@ contract DelegatedOP is AccessControl, Multicall {
     // from => to => amount
     mapping(address => mapping(address => uint256)) public subDelegations;
 
-    // Check if this address is a proxy
-    mapping(address => bool) public isProxy;
-
-    event SubDelegationRuleUpdated(
-        address indexed from,
-        address indexed to,
-        uint256 amount
-    );
-
-    event OverDelegationReduced(
-        address indexed from,
-        address indexed to,
-        uint256 amount
-    );
+    // Check if this address is a proxy, reduced or banned
+    mapping(address => DelegateStatus) public status;
 
     constructor() {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -86,8 +75,8 @@ contract DelegatedOP is AccessControl, Multicall {
     ) internal returns (uint256) {
         address proxy = IAlligatorOP(ALIGATOR_ADDRESS).proxyAddress(account);
 
-        if (!isProxy[proxy]) {
-            isProxy[proxy] = true;
+        if (status[proxy] != DelegateStatus.PROXY) {
+            status[proxy] = DelegateStatus.PROXY;
         }
 
         return IVotes(OP_ADDRESS).getVotes(proxy);
@@ -101,7 +90,8 @@ contract DelegatedOP is AccessControl, Multicall {
         uint256 totalVotes
     ) public view returns (uint256) {
         if (
-            block.timestamp < notValidBefore || block.timestamp > notValidAfter
+            block.timestamp < notValidBefore ||
+            (block.timestamp > notValidAfter && notValidAfter != 0)
         ) {
             return 0;
         }
@@ -136,12 +126,20 @@ contract DelegatedOP is AccessControl, Multicall {
                 subDelegationFrom[from] -= reduction;
                 subDelegationTo[to] -= reduction;
 
+                if (status[from] == DelegateStatus.NORMAL) {
+                    status[from] = DelegateStatus.REDUCED;
+                }
+
                 emit OverDelegationReduced(from, to, reduction);
             }
         }
     }
 
     function updateSubDelegationRule(address from, address to) public {
+        if (status[from] != DelegateStatus.NORMAL) {
+            _checkRole(OPERATOR_ROLE, msg.sender);
+        }
+
         (
             ,
             ,
@@ -179,7 +177,7 @@ contract DelegatedOP is AccessControl, Multicall {
         }
 
         // Remove delegation if over-delegated
-        // Note: Agora say in this case it’s a racing condition. We’re attributing 10 OP to both.
+        // Note: Agora say in this case it's a racing condition. We're attributing 10 OP to both.
         // if (subDelegationFrom[from] > totalVotes) {
         //     reduceOverDelegation(from, to);
         // }

@@ -8,9 +8,14 @@ type Account @entity {
 type Delegate @entity {
   id: ID!
   address: String!
+  totalVotingPower: BigInt!
   directVotingPower: BigInt!
+  subVotingPower: BigInt!
+  proxyOf: String
+  isProxy: Boolean!
   delegators: [Account]! @derivedFrom(field: "delegatedTo")
   subdelegators: [SubDelegator]! @derivedFrom(field: "to")
+  subdelegatees: [SubDelegator]! @derivedFrom(field: "from")
 }
 
 type DelegateChanged @entity {
@@ -67,7 +72,7 @@ type SubDelegationEntity @entity {
 
 type SubDelegator @entity {
   id: ID!
-  from: String!
+  from: Delegate
   to: Delegate
   maxRedelegations: Int!
   blocksBeforeVoteCloses: Int!
@@ -76,6 +81,7 @@ type SubDelegator @entity {
   customRule: String!
   allowanceType: Int!
   allowance: BigInt!
+  votingPower: BigInt!
 }
 
 # aggregate types
@@ -105,4 +111,18 @@ type DailySubDelegation @entity {
   customRule: String!
   allowanceType: Int!
   allowance: BigInt!
+}
+
+# subdelegation triggers
+type SubDelegationTriggerContainer @entity {
+  id: ID!
+  triggers: [SubDelegationTrigger!] @derivedFrom(field: "container")
+}
+
+type SubDelegationTrigger @entity {
+  id: ID!
+  from: String!
+  to: String!
+  blockTimestamp: BigInt!
+  container: SubDelegationTriggerContainer!
 }

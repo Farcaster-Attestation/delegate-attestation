@@ -6,6 +6,7 @@ import {DelegatedOPRanker} from "../src/DelegatedOPRanker.sol";
 import {ISchemaResolver} from "@eas/contracts/resolver/ISchemaResolver.sol";
 import {ISchemaRegistry, SchemaRegistry} from "@eas/contracts/SchemaRegistry.sol";
 import {IEAS, EAS, AttestationRequest, AttestationRequestData, Attestation, RevocationRequestData, RevocationRequest} from "@eas/contracts/EAS.sol";
+import {DelegateStatus} from "../src/IDelegatedOP.sol";
 
 contract MockDelegatedOP {
     mapping(address => uint256) private votes;
@@ -16,6 +17,10 @@ contract MockDelegatedOP {
 
     function getVotes(address account) external view returns (uint256) {
         return votes[account];
+    }
+
+    function status(address account) external view returns (DelegateStatus) {
+        return DelegateStatus.NORMAL;
     }
 }
 

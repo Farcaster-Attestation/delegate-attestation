@@ -3,6 +3,13 @@ pragma solidity ^0.8.0;
 
 import {IAlligatorOP} from "optimism-governor/src/interfaces/IAlligatorOP.sol";
 
+enum DelegateStatus {
+    NORMAL,
+    PROXY,
+    REDUCED,
+    BANNED
+}
+
 interface IDelegatedOP {
     event SubDelegationRuleUpdated(
         address indexed from,
@@ -15,6 +22,8 @@ interface IDelegatedOP {
         address indexed to,
         uint256 amount
     );
+
+    function status(address account) external view returns (DelegateStatus);
 
     function subDelegationFrom(address account) external view returns (uint256);
     function subDelegationTo(address account) external view returns (uint256);

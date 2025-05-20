@@ -1,11 +1,20 @@
-import { Address, BigInt, Bytes } from "@graphprotocol/graph-ts";
+import { Address, BigInt, Bytes, ethereum } from "@graphprotocol/graph-ts";
 import {
   SubDelegation as SubdelegationEvent,
   SubDelegations as SubDelegationsEvent,
   SubDelegations1 as SubDelegations2Event,
 } from "../generated/AlligatorOPV5/AlligatorOPV5";
-import { SubDelegationRuleObject, recordSubDelegation } from "./helper";
-import { SubDelegationEntity } from "../generated/schema";
+import {
+  SubDelegationRuleObject,
+  getSubDelegator,
+  recordSubDelegation,
+  updateSubDelegatorVotingPower,
+} from "./helper";
+import {
+  SubDelegationEntity,
+  SubDelegationTriggerContainer,
+  SubDelegator,
+} from "../generated/schema";
 
 export function handleSubDelegation(event: SubdelegationEvent): void {
   const fromAddress = event.params.from;
@@ -77,5 +86,28 @@ export function handleSubDelegations2(event: SubDelegations2Event): void {
       event.block.timestamp,
       event.transaction.hash
     );
+  }
+}
+
+export function handlePolling(block: ethereum.Block): void {
+  const now = block.timestamp.toU64();
+
+  for (let timestamp = now; timestamp > now - 4; timestamp--) {
+    const triggerContainer = SubDelegationTriggerContainer.load(
+      timestamp.toString()
+    );
+
+    const triggers = triggerContainer?.triggers.load();
+
+    if (triggers) {
+      for (let i = 0; i < triggers.length; i++) {
+        const trigger = triggers[i];
+        const subdelegator = getSubDelegator(
+          Address.fromHexString(trigger.from),
+          Address.fromHexString(trigger.to)
+        );
+        updateSubDelegatorVotingPower(subdelegator, BigInt.fromU64(timestamp));
+      }
+    }
   }
 }

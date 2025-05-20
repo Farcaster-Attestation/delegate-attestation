@@ -54,4 +54,6 @@ dataSources:
           handler: handleSubDelegations
         - event: SubDelegations(indexed address,address[],(uint8,uint16,uint32,uint32,address,uint8,uint256)[])
           handler: handleSubDelegations2
+      blockHandlers:
+        - handler: handlePolling
       file: ./src/alligator.ts
