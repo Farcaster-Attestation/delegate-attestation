@@ -20,6 +20,11 @@ contract DelegatedOPRanker is AccessControl, Multicall {
     // Thresholds for each rank (index 0 = rank 1, index 1 = rank 2, etc.)
     address[] public ranks;
 
+    // Votes for each account
+    mapping(address => uint256) public delegations;
+
+    error RankTooLow();
+
     event RankUpdated(
         address indexed account,
         uint256 oldRank,
@@ -29,5 +34,66 @@ contract DelegatedOPRanker is AccessControl, Multicall {
     constructor(address _delegatedOP, uint256 _maxRanks) {
         delegatedOP = _delegatedOP;
         maxRanks = _maxRanks;
+    }
+
+    function getRank(address account) public view returns (uint256) {
+        unchecked {
+            for (uint256 i = 0; i < ranks.length; i++) {
+                if (ranks[i] == account) return i + 1;
+            }
+
+            return 0;
+        }
+    }
+
+    function getRankByDelegation(
+        uint256 delegation
+    ) public view returns (uint256) {
+        unchecked {
+            for (uint256 i = 0; i < ranks.length; i++) {
+                if (delegation > delegations[ranks[i]]) return i + 1;
+            }
+
+            if (ranks.length < maxRanks) return ranks.length + 1;
+
+            return 0;
+        }
+    }
+
+    function updateRank(address account) public {
+        uint256 delegation = IDelegatedOP(delegatedOP).getVotes(account);
+        uint256 currentRank = getRank(account);
+        uint256 newRank = getRankByDelegation(delegation);
+
+        if (newRank == 0) revert RankTooLow();
+
+        // Update the delegation amount for the account
+        delegations[account] = delegation;
+
+        // If the account is already in ranks array, remove it
+        if (currentRank > 0) {
+            // Move all elements after the current position one position back
+            for (uint256 i = currentRank - 1; i < ranks.length - 1; i++) {
+                ranks[i] = ranks[i + 1];
+            }
+            ranks.pop();
+        }
+
+        // Insert the account at the new position
+        if (newRank <= ranks.length) {
+            // Move all elements from newRank-1 to end one position forward
+            ranks.push(ranks[ranks.length - 1]); // Extend array by one
+            for (uint256 i = ranks.length - 1; i > newRank - 1; i--) {
+                ranks[i] = ranks[i - 1];
+            }
+            ranks[newRank - 1] = account;
+        } else {
+            // If newRank is at the end, simply append
+            ranks.push(account);
+        }
+
+        if (currentRank != newRank) {
+            emit RankUpdated(account, currentRank, newRank);
+        }
     }
 }

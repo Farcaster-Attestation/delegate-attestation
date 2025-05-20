@@ -43,6 +43,9 @@ contract DelegatedOP is AccessControl, Multicall {
     // from => to => amount
     mapping(address => mapping(address => uint256)) public subDelegations;
 
+    // Check if this address is a proxy
+    mapping(address => bool) public isProxy;
+
     event SubDelegationRuleUpdated(
         address indexed from,
         address indexed to,
@@ -78,6 +81,18 @@ contract DelegatedOP is AccessControl, Multicall {
             );
     }
 
+    function recordProxyAndGetDelegatedVotes(
+        address account
+    ) internal returns (uint256) {
+        address proxy = IAlligatorOP(ALIGATOR_ADDRESS).proxyAddress(account);
+
+        if (!isProxy[proxy]) {
+            isProxy[proxy] = true;
+        }
+
+        return IVotes(OP_ADDRESS).getVotes(proxy);
+    }
+
     function getRuleDelegation(
         uint32 notValidBefore,
         uint32 notValidAfter,
@@ -92,7 +107,9 @@ contract DelegatedOP is AccessControl, Multicall {
         }
 
         if (allowanceType == IAlligatorOP.AllowanceType.Absolute) {
-            return allowance;
+            // Note: Agora say "it’s the MIN(allowance in the proxy, allowance in subdelegation)"
+            if (allowance <= totalVotes) return allowance;
+            else return totalVotes;
         } else if (allowanceType == IAlligatorOP.AllowanceType.Relative) {
             return (totalVotes * allowance) / 1e5;
         }
@@ -124,10 +141,7 @@ contract DelegatedOP is AccessControl, Multicall {
         }
     }
 
-    function updateSubDelegationRule(
-        address from,
-        address to
-    ) public onlyRole(OPERATOR_ROLE) {
+    function updateSubDelegationRule(address from, address to) public {
         (
             ,
             ,
@@ -141,7 +155,7 @@ contract DelegatedOP is AccessControl, Multicall {
                 to
             );
 
-        uint256 totalVotes = getProxyDelegatedVotes(from) +
+        uint256 totalVotes = recordProxyAndGetDelegatedVotes(from) +
             subDelegationTo[from];
 
         uint256 ruleDelegation = getRuleDelegation(
@@ -165,9 +179,10 @@ contract DelegatedOP is AccessControl, Multicall {
         }
 
         // Remove delegation if over-delegated
-        if (subDelegationFrom[from] > totalVotes) {
-            reduceOverDelegation(from, to);
-        }
+        // Note: Agora say in this case it’s a racing condition. We’re attributing 10 OP to both.
+        // if (subDelegationFrom[from] > totalVotes) {
+        //     reduceOverDelegation(from, to);
+        // }
 
         emit SubDelegationRuleUpdated(from, to, ruleDelegation);
     }
