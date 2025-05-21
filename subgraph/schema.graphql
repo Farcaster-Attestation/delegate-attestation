@@ -72,8 +72,8 @@ type SubDelegationEntity @entity {
 
 type SubDelegator @entity {
   id: ID!
-  from: Delegate
-  to: Delegate
+  from: Delegate!
+  to: Delegate!
   maxRedelegations: Int!
   blocksBeforeVoteCloses: Int!
   notValidBefore: BigInt!
@@ -116,13 +116,12 @@ type DailySubDelegation @entity {
 # subdelegation triggers
 type SubDelegationTriggerContainer @entity {
   id: ID!
-  triggers: [SubDelegationTrigger!] @derivedFrom(field: "container")
+  triggers: [SubDelegationTrigger!] @derivedFrom(field: "blockTimestamp")
 }
 
 type SubDelegationTrigger @entity {
   id: ID!
   from: String!
   to: String!
-  blockTimestamp: BigInt!
-  container: SubDelegationTriggerContainer!
+  blockTimestamp: SubDelegationTriggerContainer!
 }

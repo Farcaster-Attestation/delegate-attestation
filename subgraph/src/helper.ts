@@ -1,4 +1,4 @@
-import { Address, BigInt, Bytes, json } from "@graphprotocol/graph-ts";
+import { Address, BigInt, Bytes, json, store } from "@graphprotocol/graph-ts";
 import {
   Account,
   DailyBalance,
@@ -7,6 +7,8 @@ import {
   Delegate,
   ProxyAddress,
   SubDelegationEntity,
+  SubDelegationTrigger,
+  SubDelegationTriggerContainer,
   SubDelegator,
 } from "../generated/schema";
 import { AlligatorOPV5 } from "../generated/AlligatorOPV5/AlligatorOPV5";
@@ -138,6 +140,12 @@ export function getProxyAddress(
   return proxyAddress;
 }
 
+export function getProxyAddressUnsafe(address: Address): ProxyAddress | null {
+  let proxyAddressId = address.toHex();
+  let proxyAddress = ProxyAddress.load(proxyAddressId);
+  return proxyAddress;
+}
+
 export function getSubDelegator(from: Address, to: Address): SubDelegator {
   let subdelegatorId = `${from.toHex()}-${to.toHex()}`;
   let subdelegator = SubDelegator.load(subdelegatorId);
@@ -168,18 +176,41 @@ export function getDailySubDelegation(
   return dailySubDelegation;
 }
 
+export function getMaxSubDelegation(subdelegator: SubDelegator): BigInt {
+  let delegate = getDelegate(Address.fromHexString(subdelegator.from!));
+  let proxy = getProxyAddressUnsafe(Address.fromHexString(subdelegator.to!));
+
+  if (proxy == null) return delegate.subVotingPower;
+
+  let proxyDelegate = getDelegate(Address.fromHexString(proxy.proxy));
+  return delegate.subVotingPower.plus(
+    proxyDelegate?.directVotingPower ?? new BigInt(0)
+  );
+}
+
 export function updateSubDelegatorVotingPower(
   subdelegator: SubDelegator,
   blockTimestamp: BigInt
 ): void {
   let subVotingPower = new BigInt(0);
+  let maxSubDelegation = getMaxSubDelegation(subdelegator);
 
   if (
     subdelegator.notValidAfter.notEqual(BigInt.zero()) &&
     blockTimestamp.ge(subdelegator.notValidBefore) &&
     blockTimestamp.le(subdelegator.notValidAfter)
   ) {
-    subVotingPower = subdelegator.allowance;
+    if (subdelegator.allowanceType == 0) {
+      subVotingPower = subdelegator.allowance;
+    } else {
+      subVotingPower = maxSubDelegation
+        .times(subdelegator.allowance)
+        .div(BigInt.fromU32(100000));
+    }
+  }
+
+  if (subVotingPower.gt(maxSubDelegation)) {
+    subVotingPower = maxSubDelegation;
   }
 
   // update delegate voting power
@@ -191,7 +222,7 @@ export function updateSubDelegatorVotingPower(
     let delta = subdelegator.votingPower.minus(subVotingPower);
     delegate.subVotingPower = delegate.subVotingPower.minus(delta);
   }
-  delegate.totalVotingPower = delegate.totalVotingPower.plus(
+  delegate.totalVotingPower = delegate.directVotingPower.plus(
     delegate.subVotingPower
   );
   delegate.save();
@@ -199,6 +230,65 @@ export function updateSubDelegatorVotingPower(
   // update subdelegator voting power
   subdelegator.votingPower = subVotingPower;
   subdelegator.save();
+
+  updateSubDelegatorTrigger(subdelegator, blockTimestamp);
+}
+
+export function updateSubDelegatorTrigger(
+  subdelegator: SubDelegator,
+  blockTimestamp: BigInt
+): void {
+  let requireStart = subdelegator.notValidBefore.gt(blockTimestamp);
+  let requireEnd =
+    subdelegator.notValidAfter.notEqual(BigInt.zero()) &&
+    subdelegator.notValidAfter.lt(blockTimestamp);
+
+  // Remove triggers
+  let triggerStart = SubDelegationTrigger.load(`${subdelegator.id}-start`);
+  if (triggerStart != null && !requireStart) {
+    store.remove("SubDelegationTrigger", triggerStart.id);
+  }
+  let triggerEnd = SubDelegationTrigger.load(`${subdelegator.id}-end`);
+  if (triggerEnd != null && !requireEnd) {
+    store.remove("SubDelegationTrigger", triggerEnd.id);
+  }
+
+  // Create new triggers
+  if (requireStart) {
+    let triggerTimestamp = subdelegator.notValidBefore.toU64().toString();
+
+    // Create container
+    let container =
+      SubDelegationTriggerContainer.load(triggerTimestamp) ??
+      new SubDelegationTriggerContainer(triggerTimestamp);
+    container.save();
+
+    if (!triggerStart) {
+      triggerStart = new SubDelegationTrigger(`${subdelegator.id}-start`);
+    }
+    triggerStart.from = subdelegator.from;
+    triggerStart.to = subdelegator.to;
+    triggerStart.blockTimestamp = triggerTimestamp;
+    triggerStart.save();
+  }
+
+  if (requireEnd) {
+    let triggerTimestamp = (subdelegator.notValidAfter.toU64() + 1).toString();
+
+    // Create container
+    let container =
+      SubDelegationTriggerContainer.load(triggerTimestamp) ??
+      new SubDelegationTriggerContainer(triggerTimestamp);
+    container.save();
+
+    if (!triggerEnd) {
+      triggerEnd = new SubDelegationTrigger(`${subdelegator.id}-end`);
+    }
+    triggerEnd.from = subdelegator.from;
+    triggerEnd.to = subdelegator.to;
+    triggerEnd.blockTimestamp = triggerTimestamp;
+    triggerEnd.save();
+  }
 }
 
 export function recordSubDelegation(
@@ -228,6 +318,7 @@ export function recordSubDelegation(
   entity.blockTimestamp = blockTimestamp;
   entity.transactionHash = transactionHash.toHex();
   entity.save();
+
   // update subdelegation rule
   let subdelegator = getSubDelegator(fromAddress, toAddress);
   subdelegator.maxRedelegations = rule.maxRedelegations;
