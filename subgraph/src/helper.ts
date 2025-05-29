@@ -261,7 +261,9 @@ export function updateSubDelegatorTrigger(
     let container =
       SubDelegationTriggerContainer.load(triggerTimestamp) ||
       new SubDelegationTriggerContainer(triggerTimestamp);
-    container.save();
+    if (container) {
+      container.save();
+    }
 
     if (!triggerStart) {
       triggerStart = new SubDelegationTrigger(`${subdelegator.id}-start`);
@@ -279,7 +281,9 @@ export function updateSubDelegatorTrigger(
     let container =
       SubDelegationTriggerContainer.load(triggerTimestamp) ||
       new SubDelegationTriggerContainer(triggerTimestamp);
-    container.save();
+    if (container) {
+      container.save();
+    }
 
     if (!triggerEnd) {
       triggerEnd = new SubDelegationTrigger(`${subdelegator.id}-end`);
