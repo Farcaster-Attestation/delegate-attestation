@@ -177,12 +177,12 @@ export function getDailySubDelegation(
 }
 
 export function getMaxSubDelegation(subdelegator: SubDelegator): BigInt {
-  let delegate = getDelegate(Address.fromHexString(subdelegator.from!));
-  let proxy = getProxyAddressUnsafe(Address.fromHexString(subdelegator.to!));
+  let delegate = getDelegate(Address.fromString(subdelegator.from!));
+  let proxy = getProxyAddressUnsafe(Address.fromString(subdelegator.to!));
 
   if (proxy == null) return delegate.subVotingPower;
 
-  let proxyDelegate = getDelegate(Address.fromHexString(proxy.proxy));
+  let proxyDelegate = getDelegate(Address.fromString(proxy.proxy));
   return delegate.subVotingPower.plus(
     proxyDelegate.directVotingPower || new BigInt(0)
   );
@@ -214,7 +214,7 @@ export function updateSubDelegatorVotingPower(
   }
 
   // update delegate voting power
-  let delegate = getDelegate(Address.fromHexString(subdelegator.to!));
+  let delegate = getDelegate(Address.fromString(subdelegator.to!));
   if (subVotingPower.gt(subdelegator.votingPower)) {
     let delta = subVotingPower.minus(subdelegator.votingPower);
     delegate.subVotingPower = delegate.subVotingPower.plus(delta);

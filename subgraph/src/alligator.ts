@@ -103,8 +103,8 @@ export function handlePolling(block: ethereum.Block): void {
       for (let i = 0; i < triggers.length; i++) {
         const trigger = triggers[i];
         const subdelegator = getSubDelegator(
-          Address.fromHexString(trigger.from),
-          Address.fromHexString(trigger.to)
+          Address.fromString(trigger.from),
+          Address.fromString(trigger.to)
         );
         updateSubDelegatorVotingPower(subdelegator, BigInt.fromU64(timestamp));
       }

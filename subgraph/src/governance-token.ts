@@ -69,7 +69,7 @@ export function handleDelegateVotesChanged(
   // update subdelegator voting power if it's a proxy
   if (delegateEntity.isProxy && delegateEntity.proxyOf) {
     const ownerDelegate = getDelegate(
-      Address.fromHexString(delegateEntity.proxyOf)
+      Address.fromString(delegateEntity.proxyOf)
     );
     const subdelegatees = ownerDelegate.subdelegatees.load();
     for (let i = 0; i < subdelegatees.length; i++) {
