@@ -97,16 +97,21 @@ export function handlePolling(block: ethereum.Block): void {
       timestamp.toString()
     );
 
-    const triggers = triggerContainer?.triggers.load();
+    if (triggerContainer) {
+      const triggers = triggerContainer.triggers.load();
 
-    if (triggers) {
-      for (let i = 0; i < triggers.length; i++) {
-        const trigger = triggers[i];
-        const subdelegator = getSubDelegator(
-          Address.fromString(trigger.from),
-          Address.fromString(trigger.to)
-        );
-        updateSubDelegatorVotingPower(subdelegator, BigInt.fromU64(timestamp));
+      if (triggers) {
+        for (let i = 0; i < triggers.length; i++) {
+          const trigger = triggers[i];
+          const subdelegator = getSubDelegator(
+            Address.fromString(trigger.from),
+            Address.fromString(trigger.to)
+          );
+          updateSubDelegatorVotingPower(
+            subdelegator,
+            BigInt.fromU64(timestamp)
+          );
+        }
       }
     }
   }
