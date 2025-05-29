@@ -184,7 +184,7 @@ export function getMaxSubDelegation(subdelegator: SubDelegator): BigInt {
 
   let proxyDelegate = getDelegate(Address.fromHexString(proxy.proxy));
   return delegate.subVotingPower.plus(
-    proxyDelegate?.directVotingPower ?? new BigInt(0)
+    proxyDelegate.directVotingPower || new BigInt(0)
   );
 }
 
@@ -259,7 +259,7 @@ export function updateSubDelegatorTrigger(
 
     // Create container
     let container =
-      SubDelegationTriggerContainer.load(triggerTimestamp) ??
+      SubDelegationTriggerContainer.load(triggerTimestamp) ||
       new SubDelegationTriggerContainer(triggerTimestamp);
     container.save();
 
@@ -277,7 +277,7 @@ export function updateSubDelegatorTrigger(
 
     // Create container
     let container =
-      SubDelegationTriggerContainer.load(triggerTimestamp) ??
+      SubDelegationTriggerContainer.load(triggerTimestamp) ||
       new SubDelegationTriggerContainer(triggerTimestamp);
     container.save();
 
