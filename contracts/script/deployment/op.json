@@ -1,8 +1,9 @@
 {
   "chainInfo": {
     "chainId": 10,
-    "deploymentBlock": 127824768,
-    "timestamp": 1731248313
+    "deploymentBlock": 136920322,
+    "timestamp": 1749439421
   },
-  "resolver": "0x04bD1FBBc9691dB0B239175dcB61Fd37AF0A3403"
+  "delegatedOP": "0x4E9f2323b72C2BcD138aa3611f74B34851E3264d",
+  "ranker": "0xEA5b1d6ee3bF8f378913AA2cCf7A00c3e9D146BE"
 }
