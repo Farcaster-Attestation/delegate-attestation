@@ -6,10 +6,20 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "audit-power": "ts-node src/audit.ts",
     "watch": "tsc --watch"
   },
   "devDependencies": {
+    "@types/lodash": "^4.17.17",
     "@types/node": "^24.0.1",
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "axios": "^1.10.0",
+    "dotenv": "^16.5.0",
+    "lodash": "^4.17.21",
+    "viem": "^2.31.2",
+    "winston": "^3.17.0"
   }
 }

@@ -91,6 +91,10 @@ contract DelegatedOPRanker is
         }
     }
 
+    function getRanks() public view returns (address[] memory) {
+        return ranks;
+    }
+
     function _createAttestation(address account) internal returns (bytes32) {
         // Create attestation data
         bytes memory attestationData = abi.encode(true);
